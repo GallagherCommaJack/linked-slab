@@ -167,44 +167,63 @@ impl<T> List<T> {
         self.inner.contains(id.0)
     }
 
-    pub fn cursor_at(&self, id: NodeId) -> Option<Cursor<T>> {
-        if self.contains(id) {
-            Some(Cursor {
-                current: id,
-                backing: self,
-            })
-        } else {
-            None
+    pub fn cursor_front(&self) -> Cursor<T> {
+        Cursor {
+            current: self.init,
+            backing: self,
         }
     }
 
-    pub fn cursor_mut_at(&mut self, id: NodeId) -> Option<CursorMut<T>> {
-        if self.contains(id) {
-            Some(CursorMut {
-                current: id,
-                backing: self,
-            })
-        } else {
-            None
+    pub fn cursor_back(&self) -> Cursor<T> {
+        Cursor {
+            current: self.last,
+            backing: self,
+        }
+    }
+
+    pub fn cursor_at(&self, id: NodeId) -> Cursor<T> {
+        Cursor {
+            current: Some(id.0),
+            backing: self,
+        }
+    }
+
+    pub fn cursor_front_mut(&mut self) -> CursorMut<T> {
+        CursorMut {
+            current: self.init,
+            backing: self,
+        }
+    }
+
+    pub fn cursor_back_mut(&mut self) -> CursorMut<T> {
+        CursorMut {
+            current: self.last,
+            backing: self,
+        }
+    }
+
+    pub fn cursor_at_mut(&mut self, id: NodeId) -> CursorMut<T> {
+        CursorMut {
+            current: Some(id.0),
+            backing: self,
         }
     }
 }
 
 #[derive(Copy, Clone)]
 pub struct Cursor<'a, T> {
-    current: NodeId,
+    current: Option<usize>,
     backing: &'a List<T>,
 }
 
 impl<'a, T> Cursor<'a, T> {
-    pub fn current(&self) -> &'a Node<T> {
-        unsafe { self.backing.inner.get_unchecked(self.current.0) }
+    pub fn current(&self) -> Option<&'a Node<T>> {
+        self.backing.inner.get(self.current?)
     }
 
     pub fn try_next(&mut self) -> bool {
-        let node = self.current();
-        if let Some(ix) = node.next {
-            self.current = NodeId(ix);
+        if let Some(ix) = self.current().and_then(|n| n.next) {
+            self.current.replace(ix);
             true
         } else {
             false
@@ -212,9 +231,8 @@ impl<'a, T> Cursor<'a, T> {
     }
 
     pub fn try_prev(&mut self) -> bool {
-        let node = self.current();
-        if let Some(ix) = node.prev {
-            self.current = NodeId(ix);
+        if let Some(ix) = self.current().and_then(|n| n.prev) {
+            self.current.replace(ix);
             true
         } else {
             false
@@ -223,19 +241,18 @@ impl<'a, T> Cursor<'a, T> {
 }
 
 pub struct CursorMut<'a, T> {
-    current: NodeId,
+    current: Option<usize>,
     backing: &'a mut List<T>,
 }
 
 impl<'a, T> CursorMut<'a, T> {
-    pub fn current(&mut self) -> &mut Node<T> {
-        unsafe { self.backing.inner.get_unchecked_mut(self.current.0) }
+    pub fn current(&mut self) -> Option<&mut Node<T>> {
+        self.backing.inner.get_mut(self.current?)
     }
 
     pub fn try_next(&mut self) -> bool {
-        let node = self.current();
-        if let Some(ix) = node.next {
-            self.current = NodeId(ix);
+        if let Some(ix) = self.current().and_then(|n| n.next) {
+            self.current.replace(ix);
             true
         } else {
             false
@@ -243,9 +260,8 @@ impl<'a, T> CursorMut<'a, T> {
     }
 
     pub fn try_prev(&mut self) -> bool {
-        let node = self.current();
-        if let Some(ix) = node.prev {
-            self.current = NodeId(ix);
+        if let Some(ix) = self.current().and_then(|n| n.prev) {
+            self.current.replace(ix);
             true
         } else {
             false
